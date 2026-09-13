@@ -18,13 +18,19 @@ export default function JourneyClock({ time, isComplete = false }) {
   if (!time) return null;
 
   return (
-    <div className="lb-dash-badge" aria-hidden="true">
+    <div
+      className="lb-dash-badge"
+      aria-label={`Current India time: ${time}`}
+      title="Current India Standard Time"
+    >
       <span
         className={`h-1.5 w-1.5 rounded-full bg-amber ${
           isComplete ? "" : "animate-flicker motion-reduce:animate-none"
         }`}
+        aria-hidden="true"
       />
       <span>{time}</span>
+      <span className="sr-only">IST</span>
     </div>
   );
 }

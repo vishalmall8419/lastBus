@@ -6,6 +6,7 @@ import MusicPlayer from "./components/MusicSystem/MusicPlayer";
 import MoodSuggestion from "./components/MusicSystem/MoodSuggestion";
 import useMusic from "./hooks/useMusic";
 import useJourneyClock from "./hooks/useJourneyClock";
+import useCurrentTime from "./hooks/useCurrentTime";
 import heroSlides from "./data/heroSlides";
 import { resolveMoodChange } from "./utils/moodToPlaylistMap";
 
@@ -29,6 +30,7 @@ function AppContent() {
   const isFirstClockStep = useRef(true);
 
   const journeyClock = useJourneyClock(playerStatus !== "idle");
+  const currentTime = useCurrentTime();
 
   // Refs so the clock-progression effect below can read the *latest*
   // isPlaying/selectedMood without needing them in its dependency array —
@@ -39,8 +41,6 @@ function AppContent() {
   const selectedMoodRef = useRef(selectedMood);
   selectedMoodRef.current = selectedMood;
 
-  const journeyTime =
-    playerStatus === "idle" ? activeSlide.location.split("•").pop().trim() : journeyClock.time;
 
   const handleSlideChange = useCallback(
     (slide) => {
@@ -84,7 +84,7 @@ function AppContent() {
 
   return (
     <div className="relative min-h-screen w-full bg-night text-cream">
-      <TopNav journeyTime={journeyTime} isJourneyComplete={journeyClock.isJourneyComplete} />
+      <TopNav currentTime={currentTime} isJourneyComplete={journeyClock.isJourneyComplete} />
 
       <HeroCarousel
         onEnterJourney={startJourney}

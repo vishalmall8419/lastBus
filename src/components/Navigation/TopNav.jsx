@@ -1,6 +1,7 @@
 import BrandMark from "./BrandMark";
 import JourneyClock from "../JourneyClock/JourneyClock";
 import useMusic from "../../hooks/useMusic";
+import PWAInstall from "../PWAInstall/PWAInstall";
 
 /**
  * Deliberately minimal: just the brand mark, a rain toggle, and the Journey
@@ -9,7 +10,7 @@ import useMusic from "../../hooks/useMusic";
  * here would open onto nothing. Add real nav items when those screens exist
  * instead of building chrome for pages that don't.
  */
-export default function TopNav({ journeyTime, isJourneyComplete }) {
+export default function TopNav({ currentTime, isJourneyComplete }) {
   const { rainEnabled, toggleRainEnabled } = useMusic();
 
   return (
@@ -20,6 +21,7 @@ export default function TopNav({ journeyTime, isJourneyComplete }) {
       </div>
 
       <div className="pointer-events-auto flex items-center gap-2">
+        <PWAInstall />
         <button
           type="button"
           aria-pressed={rainEnabled}
@@ -31,7 +33,7 @@ export default function TopNav({ journeyTime, isJourneyComplete }) {
         >
           <span aria-hidden="true">🌧️</span>
         </button>
-        <JourneyClock time={journeyTime} isComplete={isJourneyComplete} />
+        <JourneyClock time={currentTime} isComplete={isJourneyComplete} />
       </div>
     </header>
   );
