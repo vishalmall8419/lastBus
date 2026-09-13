@@ -7,19 +7,12 @@ import {
 } from "react";
 
 import MusicContext from "../../context/MusicContext";
-
 import YouTubePlayer from "./YouTubePlayer";
 
-import {
-  searchVideos,
-} from "../../services/youtube/youtubeApi";
-
-import {
-  mapPlayerError,
-} from "../../services/youtube/youtubeHelpers";
+import { searchVideos } from "../../services/youtube/youtubeApi";
+import { mapPlayerError } from "../../services/youtube/youtubeHelpers";
 
 import useSmartShuffle from "../../hooks/useSmartShuffle";
-
 import useRadioMode from "../../hooks/useRadioMode";
 
 import playlistConfigs from "../../data/playlistConfigs";
@@ -31,96 +24,76 @@ import {
   SESSION_KEYS,
 } from "../../utils/storage";
 
-const DEFAULT_MOOD =
-  "busRadio";
+const DEFAULT_MOOD = "busRadio";
+
+/* --------------------------------------------------
+   Initial State
+-------------------------------------------------- */
 
 const initialState = {
   pool: [],
-
   history: [],
-
   historyIndex: -1,
 
   currentSong: null,
 
   isPlaying: false,
-
   playerStatus: "idle",
-
   errorMessage: null,
 
   volume: 70,
-
   isMuted: false,
 
   progress: 0,
-
   duration: 0,
 
   repeatMode: "off",
 
   isRadioMode: true,
-
   isShuffled: true,
 
-  selectedMood:
-    DEFAULT_MOOD,
+  selectedMood: DEFAULT_MOOD,
 
   rainEnabled: true,
 };
 
-/* =========================================================
-   REDUCER
-========================================================= */
+/* --------------------------------------------------
+   Reducer
+-------------------------------------------------- */
 
-function reducer(
-  state,
-  action
-) {
+function reducer(state, action) {
   switch (action.type) {
+    /* ---------------------------------------------
+       Initial Pool
+    --------------------------------------------- */
+
     case "SET_INITIAL_POOL": {
-      const pool =
-        Array.isArray(
-          action.payload
-        )
-          ? action.payload.filter(
-              (song) =>
-                song?.videoId &&
-                typeof song.videoId ===
-                  "string" &&
-                song.videoId.trim()
-                  .length === 11
-            )
-          : [];
+      const pool = Array.isArray(action.payload)
+        ? action.payload
+        : [];
 
       if (!pool.length) {
         return {
           ...state,
 
           pool: [],
-
           history: [],
-
           historyIndex: -1,
-
           currentSong: null,
 
           isPlaying: false,
 
-          playerStatus:
-            "error",
+          playerStatus: "error",
 
           errorMessage:
             "No songs found right now.",
 
           progress: 0,
-
           duration: 0,
         };
       }
 
-      const first =
-        pool[0];
+      const first = pool[0];
 
       return {
         ...state,
@@ -128,51 +101,43 @@ function reducer(
         pool,
 
         history: [first],
-
         historyIndex: 0,
 
         currentSong: first,
 
+        /*
+          IMPORTANT:
+          Song is loaded/cued but NOT playing yet.
+        */
         isPlaying: false,
 
-        playerStatus:
-          "ready",
+        playerStatus: "ready",
 
         errorMessage: null,
 
         progress: 0,
-
         duration: 0,
       };
     }
 
-    case "APPEND_POOL": {
-      const existingIds =
-        new Set(
-          state.pool.map(
-            (song) =>
-              song.videoId
-          )
-        );
+    /* ---------------------------------------------
+       Append Pool
+    --------------------------------------------- */
 
-      const additions =
-        (
-          Array.isArray(
-            action.payload
-          )
-            ? action.payload
-            : []
-        ).filter(
-          (song) =>
-            song?.videoId &&
-            typeof song.videoId ===
-              "string" &&
-            song.videoId.trim()
-              .length === 11 &&
-            !existingIds.has(
-              song.videoId
-            )
-        );
+    case "APPEND_POOL": {
+      const existingIds = new Set(
+        state.pool.map(
+          (song) => song.videoId
+        )
+      );
+
+      const additions = (
+        action.payload || []
+      ).filter(
+        (song) =>
+          song?.videoId &&
+          !existingIds.has(song.videoId)
+      );
 
       return {
         ...state,
@@ -184,13 +149,14 @@ function reducer(
       };
     }
 
-    case "GO_TO_NEW_SONG": {
-      const song =
-        action.payload;
+    /* ---------------------------------------------
+       Go To New Song
+    --------------------------------------------- */
 
-      if (
-        !song?.videoId
-      ) {
+    case "GO_TO_NEW_SONG": {
+      const song = action.payload;
+
+      if (!song?.videoId) {
         return state;
       }
 
@@ -211,41 +177,202 @@ function reducer(
 
         isPlaying: false,
 
-        playerStatus:
-          "loading",
+        playerStatus: "ready",
 
         errorMessage: null,
 
         progress: 0,
-
         duration: 0,
       };
     }
 
+    /* ---------------------------------------------
+       Step Through History
+    --------------------------------------------- */
+
     case "STEP_HISTORY": {
-      const index =
+      const historyIndex =
         action.payload;
 
       const song =
-        state.history[index];
+        state.history[historyIndex];
 
-      if (
-        !song?.videoId
-      ) {
+      if (!song?.videoId) {
         return state;
       }
 
       return {
         ...state,
 
-        historyIndex: index,
+        historyIndex,
 
         currentSong: song,
 
         isPlaying: false,
 
+        playerStatus: "ready",
+
+        errorMessage: null,
+
+        progress: 0,
+        duration: 0,
+      };
+    }
+
+    /* ---------------------------------------------
+       Playing State
+    --------------------------------------------- */
+
+    case "SET_PLAYING":
+      return {
+        ...state,
+
+        isPlaying: action.payload,
+
         playerStatus:
-          "loading",
+          action.payload
+            ? "playing"
+            : "paused",
+      };
+
+    /* ---------------------------------------------
+       Player Status
+    --------------------------------------------- */
+
+    case "SET_PLAYER_STATUS":
+      return {
+        ...state,
+
+        playerStatus:
+          action.payload,
+      };
+
+    /* ---------------------------------------------
+       Error
+    --------------------------------------------- */
+
+    case "SET_ERROR":
+      return {
+        ...state,
+
+        errorMessage:
+          action.payload,
+
+        playerStatus:
+          action.payload
+            ? "error"
+            : state.playerStatus,
+      };
+
+    /* ---------------------------------------------
+       Volume
+    --------------------------------------------- */
+
+    case "SET_VOLUME":
+      return {
+        ...state,
+
+        volume: action.payload,
+      };
+
+    /* ---------------------------------------------
+       Mute
+    --------------------------------------------- */
+
+    case "SET_MUTED":
+      return {
+        ...state,
+
+        isMuted: action.payload,
+      };
+
+    /* ---------------------------------------------
+       Progress
+    --------------------------------------------- */
+
+    case "SET_PROGRESS":
+      return {
+        ...state,
+
+        progress:
+          action.payload
+            ?.currentTime ?? 0,
+
+        duration:
+          action.payload
+            ?.duration ?? 0,
+      };
+
+    /* ---------------------------------------------
+       Repeat
+    --------------------------------------------- */
+
+    case "SET_REPEAT_MODE":
+      return {
+        ...state,
+
+        repeatMode:
+          action.payload,
+      };
+
+    /* ---------------------------------------------
+       Shuffle
+    --------------------------------------------- */
+
+    case "TOGGLE_SHUFFLE":
+      return {
+        ...state,
+
+        isShuffled:
+          !state.isShuffled,
+      };
+
+    /* ---------------------------------------------
+       Radio Mode
+    --------------------------------------------- */
+
+    case "TOGGLE_RADIO_MODE":
+      return {
+        ...state,
+
+        isRadioMode:
+          !state.isRadioMode,
+      };
+
+    /* ---------------------------------------------
+       Rain
+    --------------------------------------------- */
+
+    case "TOGGLE_RAIN_ENABLED":
+      return {
+        ...state,
+
+        rainEnabled:
+          !state.rainEnabled,
+      };
+
+    /* ---------------------------------------------
+       Switch Mood
+    --------------------------------------------- */
+
+    case "SWITCH_MOOD":
+      return {
+        ...state,
+
+        selectedMood:
+          action.payload,
+
+        pool: [],
+
+        history: [],
+
+        historyIndex: -1,
+
+        currentSong: null,
+
+        isPlaying: false,
+
+        playerStatus: "loading",
 
         errorMessage: null,
 
@@ -253,26 +380,38 @@ function reducer(
 
         duration: 0,
       };
-    }
+
+    /* ---------------------------------------------
+       Passive Mood Selection
+    --------------------------------------------- */
+
+    case "SET_SELECTED_MOOD_ONLY":
+      return {
+        ...state,
+
+        selectedMood:
+          action.payload,
+      };
+
+    /* ---------------------------------------------
+       Play Specific Song
+    --------------------------------------------- */
 
     case "PLAY_SPECIFIC_SONG": {
-      const song =
-        action.payload;
+      const song = action.payload;
 
-      if (
-        !song?.videoId
-      ) {
+      if (!song?.videoId) {
         return state;
       }
 
-      const exists =
+      const alreadyInPool =
         state.pool.some(
           (item) =>
             item.videoId ===
             song.videoId
         );
 
-      const pool = exists
+      const pool = alreadyInPool
         ? state.pool
         : [
             ...state.pool,
@@ -298,8 +437,7 @@ function reducer(
 
         isPlaying: false,
 
-        playerStatus:
-          "loading",
+        playerStatus: "ready",
 
         errorMessage: null,
 
@@ -309,150 +447,14 @@ function reducer(
       };
     }
 
-    case "SET_PLAYING":
-      return {
-        ...state,
-
-        isPlaying:
-          Boolean(
-            action.payload
-          ),
-
-        playerStatus:
-          action.payload
-            ? "playing"
-            : "paused",
-      };
-
-    case "SET_PLAYER_STATUS":
-      return {
-        ...state,
-
-        playerStatus:
-          action.payload,
-      };
-
-    case "SET_ERROR":
-      return {
-        ...state,
-
-        errorMessage:
-          action.payload,
-
-        playerStatus:
-          action.payload
-            ? "error"
-            : state.playerStatus,
-      };
-
-    case "SET_VOLUME":
-      return {
-        ...state,
-
-        volume:
-          action.payload,
-      };
-
-    case "SET_MUTED":
-      return {
-        ...state,
-
-        isMuted:
-          action.payload,
-      };
-
-    case "SET_PROGRESS":
-      return {
-        ...state,
-
-        progress:
-          Number(
-            action.payload
-              ?.currentTime
-          ) || 0,
-
-        duration:
-          Number(
-            action.payload
-              ?.duration
-          ) || 0,
-      };
-
-    case "SET_REPEAT_MODE":
-      return {
-        ...state,
-
-        repeatMode:
-          action.payload,
-      };
-
-    case "TOGGLE_SHUFFLE":
-      return {
-        ...state,
-
-        isShuffled:
-          !state.isShuffled,
-      };
-
-    case "TOGGLE_RADIO_MODE":
-      return {
-        ...state,
-
-        isRadioMode:
-          !state.isRadioMode,
-      };
-
-    case "TOGGLE_RAIN_ENABLED":
-      return {
-        ...state,
-
-        rainEnabled:
-          !state.rainEnabled,
-      };
-
-    case "SWITCH_MOOD":
-      return {
-        ...state,
-
-        selectedMood:
-          action.payload,
-
-        pool: [],
-
-        history: [],
-
-        historyIndex: -1,
-
-        currentSong: null,
-
-        isPlaying: false,
-
-        playerStatus:
-          "loading",
-
-        errorMessage: null,
-
-        progress: 0,
-
-        duration: 0,
-      };
-
-    case "SET_SELECTED_MOOD_ONLY":
-      return {
-        ...state,
-
-        selectedMood:
-          action.payload,
-      };
-
     default:
       return state;
   }
 }
 
-/* =========================================================
-   SEQUENTIAL NEXT
-========================================================= */
+/* --------------------------------------------------
+   Sequential Playback
+-------------------------------------------------- */
 
 function sequentialNext(
   pool,
@@ -470,32 +472,25 @@ function sequentialNext(
         currentSong?.videoId
     );
 
-  if (index === -1) {
-    return pool[0];
-  }
-
-  const nextIndex =
+  const proposed =
     index + 1;
 
   if (
-    nextIndex >=
+    proposed >=
     pool.length
   ) {
-    if (
-      repeatMode === "all"
-    ) {
-      return pool[0];
-    }
-
-    return null;
+    return repeatMode ===
+      "off"
+      ? null
+      : pool[0];
   }
 
-  return pool[nextIndex];
+  return pool[proposed];
 }
 
-/* =========================================================
-   INITIAL STATE
-========================================================= */
+/* --------------------------------------------------
+   Initial State Builder
+-------------------------------------------------- */
 
 function buildInitialState() {
   return {
@@ -545,34 +540,31 @@ function buildInitialState() {
   };
 }
 
-/* =========================================================
+/* ==================================================
    MUSIC PROVIDER
-========================================================= */
+================================================== */
 
 export default function MusicProvider({
   children,
 }) {
-  const [
-    state,
-    dispatch,
-  ] = useReducer(
-    reducer,
-    undefined,
-    buildInitialState
-  );
+  const [state, dispatch] =
+    useReducer(
+      reducer,
+      undefined,
+      buildInitialState
+    );
 
-  const [
-    hasStarted,
-    setHasStarted,
-  ] = useState(false);
+  const [hasStarted, setHasStarted] =
+    useState(false);
 
-  const [
-    playerReady,
-    setPlayerReady,
-  ] = useState(false);
+  const [playerReady, setPlayerReady] =
+    useState(false);
 
   const playerRef =
     useRef(null);
+
+  const hasUnlockedAudioRef =
+    useRef(false);
 
   const smartShuffle =
     useSmartShuffle();
@@ -591,275 +583,427 @@ export default function MusicProvider({
       activeConfig.queries
     );
 
-  /* =========================================================
-     SAVE SETTINGS
-  ========================================================= */
+  /* --------------------------------------------------
+     Load Current Song
+     
+     IMPORTANT:
+     We DO NOT automatically call play().
+     We only load/cue the video.
+  -------------------------------------------------- */
 
   useEffect(() => {
-    writeJSON(
-      LOCAL_KEYS.VOLUME,
-      state.volume
-    );
-  }, [state.volume]);
+    const videoId =
+      state.currentSong?.videoId;
 
-  useEffect(() => {
-    writeJSON(
-      LOCAL_KEYS.IS_MUTED,
-      state.isMuted
-    );
-  }, [state.isMuted]);
-
-  useEffect(() => {
-    writeJSON(
-      LOCAL_KEYS.SELECTED_MOOD,
-      state.selectedMood
-    );
-  }, [state.selectedMood]);
-
-  useEffect(() => {
-    writeJSON(
-      LOCAL_KEYS.IS_SHUFFLED,
-      state.isShuffled
-    );
-  }, [state.isShuffled]);
-
-  useEffect(() => {
-    writeJSON(
-      LOCAL_KEYS.REPEAT_MODE,
-      state.repeatMode
-    );
-  }, [state.repeatMode]);
-
-  useEffect(() => {
-    writeJSON(
-      LOCAL_KEYS.IS_RADIO_MODE,
-      state.isRadioMode
-    );
-  }, [state.isRadioMode]);
-
-  useEffect(() => {
-    writeJSON(
-      LOCAL_KEYS.RAIN_ENABLED,
-      state.rainEnabled
-    );
-  }, [state.rainEnabled]);
-
-  /* =========================================================
-     VOLUME
-  ========================================================= */
-
-  useEffect(() => {
-    if (
-      playerReady &&
-      playerRef.current
-    ) {
-      playerRef.current.setVolume(
-        state.volume
-      );
-    }
-  }, [
-    state.volume,
-    playerReady,
-  ]);
-
-  /* =========================================================
-     MUTE
-  ========================================================= */
-
-  useEffect(() => {
     if (
       !playerReady ||
+      !videoId ||
       !playerRef.current
     ) {
       return;
     }
 
+    /*
+      Make sure video ID is valid.
+    */
+
     if (
-      state.isMuted
+      typeof videoId !== "string" ||
+      videoId.trim().length !== 11
     ) {
+      dispatch({
+        type: "SET_ERROR",
+        payload:
+          "Invalid YouTube video ID.",
+      });
+
+      return;
+    }
+
+    /*
+      Reset UI state while new
+      video is being prepared.
+    */
+
+    dispatch({
+      type: "SET_PLAYING",
+      payload: false,
+    });
+
+    dispatch({
+      type: "SET_PLAYER_STATUS",
+      payload: "loading",
+    });
+
+    /*
+      IMPORTANT:
+
+      cue() loads the video without
+      automatically starting playback.
+
+      Your YouTubePlayer wrapper must
+      expose cueVideoById().
+    */
+
+    if (
+      typeof playerRef.current
+        .cueVideoById ===
+      "function"
+    ) {
+      playerRef.current.cueVideoById(
+        videoId
+      );
+    } else {
+      /*
+        Fallback for the current wrapper.
+
+        loadVideoById() may start playback,
+        but the state will only become
+        "playing" after YouTube sends
+        the real PLAYING event.
+      */
+
+      playerRef.current.loadVideoById(
+        videoId
+      );
+    }
+
+    smartShuffle.remember(
+      videoId
+    );
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    playerReady,
+    state.currentSong?.videoId,
+  ]);
+
+  /* --------------------------------------------------
+     Volume
+  -------------------------------------------------- */
+
+  useEffect(() => {
+    if (!playerRef.current) {
+      return;
+    }
+
+    playerRef.current.setVolume(
+      state.volume
+    );
+  }, [
+    state.volume,
+  ]);
+
+  /* --------------------------------------------------
+     Mute
+  -------------------------------------------------- */
+
+  useEffect(() => {
+    if (!playerRef.current) {
+      return;
+    }
+
+    if (state.isMuted) {
       playerRef.current.mute();
     } else {
       playerRef.current.unMute();
     }
   }, [
     state.isMuted,
-    playerReady,
   ]);
 
-  /* =========================================================
-     START JOURNEY
-  ========================================================= */
+  /* --------------------------------------------------
+     Smart Shuffle Hydration
+  -------------------------------------------------- */
 
-  const startJourney =
+  useEffect(() => {
+    const persistedRecent =
+      readJSON(
+        LOCAL_KEYS.RECENTLY_PLAYED_IDS
+      );
+
+    if (
+      persistedRecent
+    ) {
+      smartShuffle.hydrate(
+        persistedRecent
+      );
+    }
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /* --------------------------------------------------
+     LocalStorage - Volume
+  -------------------------------------------------- */
+
+  useEffect(() => {
+    writeJSON(
+      LOCAL_KEYS.VOLUME,
+      state.volume
+    );
+  }, [
+    state.volume,
+  ]);
+
+  /* --------------------------------------------------
+     LocalStorage - Mute
+  -------------------------------------------------- */
+
+  useEffect(() => {
+    writeJSON(
+      LOCAL_KEYS.IS_MUTED,
+      state.isMuted
+    );
+  }, [
+    state.isMuted,
+  ]);
+
+  /* --------------------------------------------------
+     LocalStorage - Mood
+  -------------------------------------------------- */
+
+  useEffect(() => {
+    writeJSON(
+      LOCAL_KEYS.SELECTED_MOOD,
+      state.selectedMood
+    );
+  }, [
+    state.selectedMood,
+  ]);
+
+  /* --------------------------------------------------
+     LocalStorage - Shuffle
+  -------------------------------------------------- */
+
+  useEffect(() => {
+    writeJSON(
+      LOCAL_KEYS.IS_SHUFFLED,
+      state.isShuffled
+    );
+  }, [
+    state.isShuffled,
+  ]);
+
+  /* --------------------------------------------------
+     LocalStorage - Repeat
+  -------------------------------------------------- */
+
+  useEffect(() => {
+    writeJSON(
+      LOCAL_KEYS.REPEAT_MODE,
+      state.repeatMode
+    );
+  }, [
+    state.repeatMode,
+  ]);
+
+  /* --------------------------------------------------
+     LocalStorage - Radio
+  -------------------------------------------------- */
+
+  useEffect(() => {
+    writeJSON(
+      LOCAL_KEYS.IS_RADIO_MODE,
+      state.isRadioMode
+    );
+  }, [
+    state.isRadioMode,
+  ]);
+
+  /* --------------------------------------------------
+     LocalStorage - Rain
+  -------------------------------------------------- */
+
+  useEffect(() => {
+    writeJSON(
+      LOCAL_KEYS.RAIN_ENABLED,
+      state.rainEnabled
+    );
+  }, [
+    state.rainEnabled,
+  ]);
+
+  /* --------------------------------------------------
+     Recently Played
+  -------------------------------------------------- */
+
+  useEffect(() => {
+    if (!state.history.length) {
+      return;
+    }
+
+    const ids =
+      state.history
+        .slice(-30)
+        .map(
+          (song) =>
+            song.videoId
+        )
+        .filter(Boolean);
+
+    writeJSON(
+      LOCAL_KEYS.RECENTLY_PLAYED_IDS,
+      ids
+    );
+  }, [
+    state.history,
+  ]);
+
+  /* --------------------------------------------------
+     Session Mood
+  -------------------------------------------------- */
+
+  useEffect(() => {
+    writeJSON(
+      SESSION_KEYS.CURRENT_MOOD,
+      state.selectedMood,
+      "session"
+    );
+  }, [
+    state.selectedMood,
+  ]);
+
+  /* --------------------------------------------------
+     Session Queue
+  -------------------------------------------------- */
+
+  useEffect(() => {
+    const ids =
+      state.history
+        .map(
+          (song) =>
+            song.videoId
+        )
+        .filter(Boolean);
+
+    writeJSON(
+      SESSION_KEYS.SESSION_QUEUE,
+      ids,
+      "session"
+    );
+  }, [
+    state.history,
+  ]);
+
+  /* --------------------------------------------------
+     Journey Started Timestamp
+  -------------------------------------------------- */
+
+  const journeyStartedRef =
+    useRef(false);
+
+  useEffect(() => {
+    if (
+      !journeyStartedRef.current &&
+      state.playerStatus !==
+        "idle"
+    ) {
+      journeyStartedRef.current =
+        true;
+
+      writeJSON(
+        SESSION_KEYS.JOURNEY_STARTED_AT,
+        new Date().toISOString(),
+        "session"
+      );
+    }
+  }, [
+    state.playerStatus,
+  ]);
+
+  /* --------------------------------------------------
+     Radio Mode Top Up
+  -------------------------------------------------- */
+
+  const maybeTopUpPool =
     useCallback(
       async () => {
-        setHasStarted(true);
-
-        /*
-        If a song already exists,
-        Play button itself is a user gesture.
-        */
-
         if (
-          state.currentSong?.videoId &&
-          playerReady
+          !state.isRadioMode
         ) {
-          playerRef.current?.play();
-
           return;
         }
 
-        dispatch({
-          type:
-            "SET_PLAYER_STATUS",
+        radioMode.registerSongPlayed();
 
-          payload:
-            "loading",
-        });
+        if (
+          !radioMode.shouldTopUp(
+            state.pool.length
+          )
+        ) {
+          return;
+        }
 
         try {
-          const {
-            items,
-          } =
-            await searchVideos(
-              activeConfig
-                .queries[0],
-              {
-                maxResults: 25,
-              }
-            );
+          const { items } =
+            await radioMode.fetchTopUp();
 
-          dispatch({
-            type:
-              "SET_INITIAL_POOL",
-
-            payload:
-              items,
-          });
+          if (
+            items?.length
+          ) {
+            dispatch({
+              type:
+                "APPEND_POOL",
+              payload: items,
+            });
+          }
         } catch (error) {
-          dispatch({
-            type:
-              "SET_ERROR",
-
-            payload:
-              error?.message ||
-              "Couldn't start the radio right now.",
-          });
+          console.error(
+            "Radio top-up failed:",
+            error
+          );
         }
       },
+
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       [
-        state.currentSong?.videoId,
-        playerReady,
-        activeConfig,
+        state.isRadioMode,
+        state.pool.length,
       ]
     );
 
-  /* =========================================================
-     PLAY / PAUSE
-  ========================================================= */
-
-  const togglePlay =
-    useCallback(
-      () => {
-        /*
-        No song.
-        */
-
-        if (
-          !state.currentSong?.videoId
-        ) {
-          startJourney();
-
-          return;
-        }
-
-        if (
-          !playerReady ||
-          !playerRef.current
-        ) {
-          return;
-        }
-
-        /*
-        PAUSE
-        */
-
-        if (
-          state.isPlaying
-        ) {
-          playerRef.current.pause();
-
-          return;
-        }
-
-        /*
-        PLAY
-
-        This happens directly from the user's
-        Play button click.
-        */
-
-        playerRef.current.play();
-      },
-      [
-        state.currentSong?.videoId,
-        state.isPlaying,
-        playerReady,
-        startJourney,
-      ]
-    );
-
-  /* =========================================================
-     NEXT
-  ========================================================= */
+  /* --------------------------------------------------
+     Next Song
+  -------------------------------------------------- */
 
   const advanceForward =
     useCallback(
       () => {
-        if (
-          !state.pool.length
-        ) {
-          return;
-        }
-
-        let nextSong =
-          null;
-
         /*
-        ---------------------------------------------------------
-        HISTORY FORWARD
-        ---------------------------------------------------------
+          If user previously pressed
+          Previous, move forward through
+          existing history.
         */
 
         if (
           state.historyIndex <
           state.history.length - 1
         ) {
-          nextSong =
-            state.history[
-              state.historyIndex + 1
-            ];
+          dispatch({
+            type:
+              "STEP_HISTORY",
+
+            payload:
+              state.historyIndex +
+              1,
+          });
+
+          return;
         }
 
-        /*
-        ---------------------------------------------------------
-        NEW SONG
-        ---------------------------------------------------------
-        */
-
-        if (!nextSong) {
-          nextSong =
-            state.isShuffled
-              ? smartShuffle.pickNext(
-                  state.pool,
-                  state.currentSong?.videoId
-                )
-              : sequentialNext(
-                  state.pool,
-                  state.currentSong,
-                  state.repeatMode
-                );
-        }
+        const nextSong =
+          state.isShuffled
+            ? smartShuffle.pickNext(
+                state.pool,
+                state.currentSong
+                  ?.videoId
+              )
+            : sequentialNext(
+                state.pool,
+                state.currentSong,
+                state.repeatMode
+              );
 
         if (
           !nextSong?.videoId
@@ -875,214 +1019,85 @@ export default function MusicProvider({
           return;
         }
 
-        /*
-        =========================================================
-        MOST IMPORTANT FIX
-        =========================================================
+        dispatch({
+          type:
+            "GO_TO_NEW_SONG",
 
-        Next button ka click abhi active hai.
+          payload:
+            nextSong,
+        });
 
-        Isliye loadAndPlay() ko DIRECT yahin call
-        kar rahe hain.
+        maybeTopUpPool();
+      },
 
-        useEffect mein nahi.
-        =========================================================
-        */
+      [
+        state.historyIndex,
+        state.history,
+        state.isShuffled,
+        state.pool,
+        state.currentSong,
+        state.repeatMode,
+        smartShuffle.pickNext,
+        maybeTopUpPool,
+      ]
+    );
 
+  /* --------------------------------------------------
+     Previous
+  -------------------------------------------------- */
+
+  const prev =
+    useCallback(
+      () => {
         if (
-          playerReady &&
-          playerRef.current
-        ) {
-          playerRef.current.loadAndPlay(
-            nextSong.videoId
-          );
-        }
-
-        /*
-        UI state update.
-        */
-
-        if (
-          state.historyIndex <
-          state.history.length - 1
+          state.historyIndex >
+          0
         ) {
           dispatch({
             type:
               "STEP_HISTORY",
 
             payload:
-              state.historyIndex + 1,
+              state.historyIndex -
+              1,
           });
-        } else {
-          dispatch({
-            type:
-              "GO_TO_NEW_SONG",
-
-            payload:
-              nextSong,
-          });
-        }
-
-        smartShuffle.remember(
-          nextSong.videoId
-        );
-
-        /*
-        Radio pool background top-up.
-        */
-
-        if (
-          state.isRadioMode
-        ) {
-          radioMode.registerSongPlayed();
-
-          if (
-            radioMode.shouldTopUp(
-              state.pool.length
-            )
-          ) {
-            radioMode
-              .fetchTopUp()
-              .then(
-                ({
-                  items,
-                }) => {
-                  if (
-                    items?.length
-                  ) {
-                    dispatch({
-                      type:
-                        "APPEND_POOL",
-
-                      payload:
-                        items,
-                    });
-                  }
-                }
-              )
-              .catch(
-                console.error
-              );
-          }
         }
       },
+
       [
-        state.pool,
         state.historyIndex,
-        state.history,
-        state.isShuffled,
-        state.currentSong,
-        state.repeatMode,
-        state.isRadioMode,
-        playerReady,
-        smartShuffle,
-        radioMode,
       ]
     );
 
-  /* =========================================================
-     PREVIOUS
-  ========================================================= */
-
-  const prev =
-    useCallback(
-      () => {
-        if (
-          state.historyIndex <= 0
-        ) {
-          return;
-        }
-
-        const previousSong =
-          state.history[
-            state.historyIndex - 1
-          ];
-
-        if (
-          !previousSong?.videoId
-        ) {
-          return;
-        }
-
-        /*
-        Direct user click:
-        load + play immediately.
-        */
-
-        if (
-          playerReady &&
-          playerRef.current
-        ) {
-          playerRef.current.loadAndPlay(
-            previousSong.videoId
-          );
-        }
-
-        dispatch({
-          type:
-            "STEP_HISTORY",
-
-          payload:
-            state.historyIndex - 1,
-        });
-      },
-      [
-        state.historyIndex,
-        state.history,
-        playerReady,
-      ]
-    );
-
-  /* =========================================================
-     HISTORY SELECT
-  ========================================================= */
+  /* --------------------------------------------------
+     Go To History
+  -------------------------------------------------- */
 
   const goToHistoryIndex =
     useCallback(
       (index) => {
         if (
-          index < 0 ||
-          index >=
+          index >= 0 &&
+          index <
             state.history.length
         ) {
-          return;
+          dispatch({
+            type:
+              "STEP_HISTORY",
+
+            payload: index,
+          });
         }
-
-        const song =
-          state.history[index];
-
-        if (
-          !song?.videoId
-        ) {
-          return;
-        }
-
-        if (
-          playerReady &&
-          playerRef.current
-        ) {
-          playerRef.current.loadAndPlay(
-            song.videoId
-          );
-        }
-
-        dispatch({
-          type:
-            "STEP_HISTORY",
-
-          payload:
-            index,
-        });
       },
+
       [
-        state.history,
-        playerReady,
+        state.history.length,
       ]
     );
 
-  /* =========================================================
-     REPLAY
-  ========================================================= */
+  /* --------------------------------------------------
+     Replay Current Song
+  -------------------------------------------------- */
 
   const replayCurrent =
     useCallback(
@@ -1094,127 +1109,246 @@ export default function MusicProvider({
         }
 
         playerRef.current.seekTo(
-          0
+          0,
+          true
         );
 
         playerRef.current.play();
+
+        /*
+          Don't optimistically update
+          isPlaying.
+
+          handleStateChange()
+          will update it when YouTube
+          confirms PLAYING.
+        */
       },
+
       []
     );
 
-  /* =========================================================
-     PLAY SPECIFIC SONG
-  ========================================================= */
+  /* --------------------------------------------------
+     Start Journey
+  -------------------------------------------------- */
 
-  const playSongNow =
+  const startJourney =
     useCallback(
-      (song) => {
-        if (
-          !song?.videoId
-        ) {
-          return;
-        }
-
+      async () => {
         setHasStarted(true);
 
         /*
-        Direct user action.
+          If a song already exists,
+          play it from the user gesture.
         */
 
         if (
-          playerReady &&
-          playerRef.current
+          state.currentSong?.videoId
         ) {
-          playerRef.current.loadAndPlay(
-            song.videoId
-          );
+          if (
+            playerRef.current
+          ) {
+            playerRef.current.play();
+          }
+
+          return;
         }
+
+        /*
+          No song available.
+          Search YouTube.
+        */
 
         dispatch({
           type:
-            "PLAY_SPECIFIC_SONG",
+            "SET_PLAYER_STATUS",
 
           payload:
-            song,
+            "loading",
         });
+
+        try {
+          const { items } =
+            await searchVideos(
+              activeConfig
+                .queries[0],
+              {
+                maxResults: 25,
+              }
+            );
+
+          /*
+            Keep only valid YouTube
+            video IDs.
+          */
+
+          const validItems =
+            (items || []).filter(
+              (song) =>
+                song?.videoId &&
+                typeof song.videoId ===
+                  "string" &&
+                song.videoId.trim()
+                  .length === 11
+            );
+
+          dispatch({
+            type:
+              "SET_INITIAL_POOL",
+
+            payload:
+              validItems,
+          });
+
+          /*
+            IMPORTANT:
+            We DON'T call play() here.
+
+            Search is asynchronous, so by
+            the time results arrive the
+            original click gesture is gone.
+
+            User will click Play after the
+            song is loaded.
+          */
+        } catch (error) {
+          dispatch({
+            type:
+              "SET_ERROR",
+
+            payload:
+              error?.message ||
+              "Couldn't start the radio right now.",
+          });
+        }
       },
-      [playerReady]
+
+      [
+        state.currentSong?.videoId,
+        activeConfig,
+      ]
     );
 
-  /* =========================================================
-     SEEK
-  ========================================================= */
+  /* --------------------------------------------------
+     Toggle Play / Pause
+  -------------------------------------------------- */
 
-  const seekTo =
+  const togglePlay =
     useCallback(
-      (seconds) => {
-        const value =
-          Number(seconds);
+      () => {
+        /*
+          No current song:
+          start journey.
+        */
 
         if (
-          !Number.isFinite(value)
+          !state.currentSong?.videoId
+        ) {
+          startJourney();
+
+          return;
+        }
+
+        /*
+          Player isn't ready yet.
+        */
+
+        if (
+          !playerReady ||
+          !playerRef.current
         ) {
           return;
         }
 
-        playerRef.current?.seekTo(
-          value
-        );
+        /*
+          PAUSE
+        */
 
-        dispatch({
-          type:
-            "SET_PROGRESS",
+        if (
+          state.isPlaying
+        ) {
+          playerRef.current.pause();
 
-          payload: {
-            currentTime:
-              value,
+          /*
+            UI will also receive the
+            actual PAUSED event.
+          */
 
-            duration:
-              state.duration,
-          },
-        });
+          return;
+        }
+
+        /*
+          PLAY
+
+          This function is triggered by
+          the user's actual button click.
+        */
+
+        playerRef.current.play();
+
+        /*
+          IMPORTANT:
+          Do NOT dispatch SET_PLAYING true
+          here.
+
+          YouTube will send:
+          event.data === 1
+
+          and handleStateChange()
+          will update the UI.
+        */
       },
-      [state.duration]
+
+      [
+        state.currentSong?.videoId,
+        state.isPlaying,
+        playerReady,
+        startJourney,
+      ]
     );
 
-  /* =========================================================
-     VOLUME
-  ========================================================= */
+  /* --------------------------------------------------
+     Volume
+  -------------------------------------------------- */
 
   const setVolume =
     useCallback(
       (value) => {
-        const numeric =
+        const numericValue =
           Number(value);
 
         if (
-          !Number.isFinite(
-            numeric
+          Number.isNaN(
+            numericValue
           )
         ) {
           return;
         }
+
+        const safeValue =
+          Math.min(
+            100,
+            Math.max(
+              0,
+              numericValue
+            )
+          );
 
         dispatch({
           type:
             "SET_VOLUME",
 
           payload:
-            Math.min(
-              100,
-              Math.max(
-                0,
-                numeric
-              )
-            ),
+            safeValue,
         });
       },
+
       []
     );
 
-  /* =========================================================
-     MUTE
-  ========================================================= */
+  /* --------------------------------------------------
+     Toggle Mute
+  -------------------------------------------------- */
 
   const toggleMute =
     useCallback(
@@ -1227,12 +1361,15 @@ export default function MusicProvider({
             !state.isMuted,
         });
       },
-      [state.isMuted]
+
+      [
+        state.isMuted,
+      ]
     );
 
-  /* =========================================================
-     REPEAT
-  ========================================================= */
+  /* --------------------------------------------------
+     Repeat Mode
+  -------------------------------------------------- */
 
   const setRepeatMode =
     useCallback(
@@ -1241,16 +1378,16 @@ export default function MusicProvider({
           type:
             "SET_REPEAT_MODE",
 
-          payload:
-            mode,
+          payload: mode,
         });
       },
+
       []
     );
 
-  /* =========================================================
-     SHUFFLE
-  ========================================================= */
+  /* --------------------------------------------------
+     Shuffle
+  -------------------------------------------------- */
 
   const toggleShuffle =
     useCallback(
@@ -1260,12 +1397,13 @@ export default function MusicProvider({
             "TOGGLE_SHUFFLE",
         });
       },
+
       []
     );
 
-  /* =========================================================
-     RADIO
-  ========================================================= */
+  /* --------------------------------------------------
+     Radio Mode
+  -------------------------------------------------- */
 
   const toggleRadioMode =
     useCallback(
@@ -1275,12 +1413,13 @@ export default function MusicProvider({
             "TOGGLE_RADIO_MODE",
         });
       },
+
       []
     );
 
-  /* =========================================================
-     RAIN
-  ========================================================= */
+  /* --------------------------------------------------
+     Rain
+  -------------------------------------------------- */
 
   const toggleRainEnabled =
     useCallback(
@@ -1290,12 +1429,13 @@ export default function MusicProvider({
             "TOGGLE_RAIN_ENABLED",
         });
       },
+
       []
     );
 
-  /* =========================================================
-     SELECT MOOD
-  ========================================================= */
+  /* --------------------------------------------------
+     Select Mood
+  -------------------------------------------------- */
 
   const selectMood =
     useCallback(
@@ -1312,10 +1452,10 @@ export default function MusicProvider({
         setHasStarted(true);
 
         /*
-        Stop current song first.
+          Reset player readiness.
         */
 
-        playerRef.current?.stop();
+        setPlayerReady(false);
 
         dispatch({
           type:
@@ -1326,9 +1466,7 @@ export default function MusicProvider({
         });
 
         try {
-          const {
-            items,
-          } =
+          const { items } =
             await searchVideos(
               config.queries[0],
               {
@@ -1336,12 +1474,22 @@ export default function MusicProvider({
               }
             );
 
+          const validItems =
+            (items || []).filter(
+              (song) =>
+                song?.videoId &&
+                typeof song.videoId ===
+                  "string" &&
+                song.videoId.trim()
+                  .length === 11
+            );
+
           dispatch({
             type:
               "SET_INITIAL_POOL",
 
             payload:
-              items,
+              validItems,
           });
         } catch (error) {
           dispatch({
@@ -1350,16 +1498,17 @@ export default function MusicProvider({
 
             payload:
               error?.message ||
-              "Couldn't switch playlist.",
+              "Couldn't switch playlists right now.",
           });
         }
       },
+
       []
     );
 
-  /* =========================================================
-     PRESET MOOD
-  ========================================================= */
+  /* --------------------------------------------------
+     Preset Mood
+  -------------------------------------------------- */
 
   const presetMood =
     useCallback(
@@ -1380,12 +1529,86 @@ export default function MusicProvider({
             moodKey,
         });
       },
+
       []
     );
 
-  /* =========================================================
-     YOUTUBE STATE CHANGE
-  ========================================================= */
+  /* --------------------------------------------------
+     Play Specific Song
+  -------------------------------------------------- */
+
+  const playSongNow =
+    useCallback(
+      (song) => {
+        if (
+          !song?.videoId
+        ) {
+          return;
+        }
+
+        setHasStarted(true);
+
+        dispatch({
+          type:
+            "PLAY_SPECIFIC_SONG",
+
+          payload:
+            song,
+        });
+
+        /*
+          Actual playback happens only
+          after the YouTube player receives
+          the song and user presses Play.
+        */
+      },
+
+      []
+    );
+
+  /* --------------------------------------------------
+     Seek
+  -------------------------------------------------- */
+
+  const seekTo =
+    useCallback(
+      (seconds) => {
+        const value =
+          Number(seconds);
+
+        if (
+          Number.isNaN(value)
+        ) {
+          return;
+        }
+
+        playerRef.current?.seekTo(
+          value,
+          true
+        );
+
+        dispatch({
+          type:
+            "SET_PROGRESS",
+
+          payload: {
+            currentTime:
+              value,
+
+            duration:
+              state.duration,
+          },
+        });
+      },
+
+      [
+        state.duration,
+      ]
+    );
+
+  /* ==================================================
+     YouTube State Change
+  ================================================== */
 
   const handleStateChange =
     useCallback(
@@ -1395,10 +1618,19 @@ export default function MusicProvider({
         }
 
         /*
-        ---------------------------------------------------------
-        ENDED
-        ---------------------------------------------------------
+          YouTube PlayerState:
+
+          -1 = unstarted
+           0 = ended
+           1 = playing
+           2 = paused
+           3 = buffering
+           5 = cued
         */
+
+        /* ---------------------------------------------
+           ENDED
+        --------------------------------------------- */
 
         if (
           event.data === 0
@@ -1408,24 +1640,16 @@ export default function MusicProvider({
             "one"
           ) {
             replayCurrent();
-
-            return;
+          } else {
+            advanceForward();
           }
-
-          /*
-          Automatic next.
-          */
-
-          advanceForward();
 
           return;
         }
 
-        /*
-        ---------------------------------------------------------
-        PLAYING
-        ---------------------------------------------------------
-        */
+        /* ---------------------------------------------
+           PLAYING
+        --------------------------------------------- */
 
         if (
           event.data === 1
@@ -1434,9 +1658,27 @@ export default function MusicProvider({
             type:
               "SET_PLAYING",
 
-            payload:
-              true,
+            payload: true,
           });
+
+          /*
+            First confirmed playback.
+
+            Audio can now be unlocked.
+          */
+
+          if (
+            !hasUnlockedAudioRef.current
+          ) {
+            hasUnlockedAudioRef.current =
+              true;
+
+            if (
+              !state.isMuted
+            ) {
+              playerRef.current?.unMute();
+            }
+          }
 
           dispatch({
             type:
@@ -1446,25 +1688,12 @@ export default function MusicProvider({
               "playing",
           });
 
-          /*
-          If user has not muted,
-          make sure player is unmuted.
-          */
-
-          if (
-            !state.isMuted
-          ) {
-            playerRef.current?.unMute();
-          }
-
           return;
         }
 
-        /*
-        ---------------------------------------------------------
-        PAUSED
-        ---------------------------------------------------------
-        */
+        /* ---------------------------------------------
+           PAUSED
+        --------------------------------------------- */
 
         if (
           event.data === 2
@@ -1473,26 +1702,15 @@ export default function MusicProvider({
             type:
               "SET_PLAYING",
 
-            payload:
-              false,
-          });
-
-          dispatch({
-            type:
-              "SET_PLAYER_STATUS",
-
-            payload:
-              "paused",
+            payload: false,
           });
 
           return;
         }
 
-        /*
-        ---------------------------------------------------------
-        BUFFERING
-        ---------------------------------------------------------
-        */
+        /* ---------------------------------------------
+           BUFFERING
+        --------------------------------------------- */
 
         if (
           event.data === 3
@@ -1508,23 +1726,13 @@ export default function MusicProvider({
           return;
         }
 
-        /*
-        ---------------------------------------------------------
-        CUED
-        ---------------------------------------------------------
-        */
+        /* ---------------------------------------------
+           CUED
+        --------------------------------------------- */
 
         if (
           event.data === 5
         ) {
-          dispatch({
-            type:
-              "SET_PLAYING",
-
-            payload:
-              false,
-          });
-
           dispatch({
             type:
               "SET_PLAYER_STATUS",
@@ -1532,49 +1740,27 @@ export default function MusicProvider({
             payload:
               "ready",
           });
+
+          dispatch({
+            type:
+              "SET_PLAYING",
+
+            payload: false,
+          });
         }
       },
+
       [
-        state.repeatMode,
-        state.isMuted,
         advanceForward,
         replayCurrent,
+        state.repeatMode,
+        state.isMuted,
       ]
     );
 
-  /* =========================================================
-     AUTOPLAY BLOCKED
-  ========================================================= */
-
-  const handleAutoplayBlocked =
-    useCallback(
-      () => {
-        console.warn(
-          "YouTube blocked playback. Press Play to continue."
-        );
-
-        dispatch({
-          type:
-            "SET_PLAYING",
-
-          payload:
-            false,
-        });
-
-        dispatch({
-          type:
-            "SET_PLAYER_STATUS",
-
-          payload:
-            "paused",
-        });
-      },
-      []
-    );
-
-  /* =========================================================
-     YOUTUBE ERROR
-  ========================================================= */
+  /* ==================================================
+     YouTube Error
+  ================================================== */
 
   const handleError =
     useCallback(
@@ -1597,18 +1783,26 @@ export default function MusicProvider({
             "Unable to play this song.",
         });
 
+        /*
+          Skip broken/private/deleted
+          videos automatically.
+        */
+
         if (
           mapped?.skip
         ) {
           advanceForward();
         }
       },
-      [advanceForward]
+
+      [
+        advanceForward,
+      ]
     );
 
-  /* =========================================================
-     CONTEXT
-  ========================================================= */
+  /* ==================================================
+     Context Value
+  ================================================== */
 
   const value = {
     ...state,
@@ -1645,9 +1839,9 @@ export default function MusicProvider({
     seekTo,
   };
 
-  /* =========================================================
-     RENDER
-  ========================================================= */
+  /* ==================================================
+     Render
+  ================================================== */
 
   return (
     <MusicContext.Provider
@@ -1656,46 +1850,47 @@ export default function MusicProvider({
       {children}
 
       {/*
-      Player ko current song ke saath sirf
-      FIRST time create karo.
-
-      Uske baad Next/Previous direct player
-      methods se video change karega.
+        YouTube player is mounted only after
+        journey has started and a valid video
+        ID exists.
       */}
 
       {hasStarted &&
         state.currentSong?.videoId && (
           <YouTubePlayer
             ref={playerRef}
+
             videoId={
               state.currentSong.videoId
             }
+
             volume={
               state.volume
             }
+
             onReady={() => {
               setPlayerReady(true);
             }}
+
             onStateChange={
               handleStateChange
             }
+
             onError={
               handleError
             }
-            onAutoplayBlocked={
-              handleAutoplayBlocked
-            }
-            onProgress={(
-              progress
-            ) => {
-              dispatch({
-                type:
-                  "SET_PROGRESS",
 
-                payload:
-                  progress,
-              });
-            }}
+            onProgress={
+              (progress) => {
+                dispatch({
+                  type:
+                    "SET_PROGRESS",
+
+                  payload:
+                    progress,
+                });
+              }
+            }
           />
         )}
     </MusicContext.Provider>

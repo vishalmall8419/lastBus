@@ -8,11 +8,8 @@ import {
 import { createPlayer } from "../../services/youtube/youtubePlayer";
 
 const ELEMENT_ID = "last-bus-youtube-player";
-const PROGRESS_POLL_MS = 250;
 
-const isValidVideoId = (id) =>
-  typeof id === "string" &&
-  id.trim().length === 11;
+const PROGRESS_POLL_MS = 500;
 
 const YouTubePlayer = forwardRef(function YouTubePlayer(
   {
@@ -22,261 +19,297 @@ const YouTubePlayer = forwardRef(function YouTubePlayer(
     onStateChange,
     onError,
     onProgress,
-    onAutoplayBlocked,
   },
   ref
 ) {
   const playerRef = useRef(null);
-  const pollRef = useRef(null);
-  const destroyedRef = useRef(false);
 
-  const stopPolling = () => {
+  const pollRef = useRef(null);
+
+  const cancelledRef = useRef(false);
+
+  /* --------------------------------------------------
+     Validate YouTube Video ID
+  -------------------------------------------------- */
+
+  const isValidVideoId = (id) => {
+    return (
+      typeof id === "string" &&
+      id.trim().length === 11
+    );
+  };
+
+  /* --------------------------------------------------
+     Stop Progress Polling
+  -------------------------------------------------- */
+
+  const stopProgressPolling = () => {
     if (pollRef.current) {
       clearInterval(pollRef.current);
       pollRef.current = null;
     }
   };
 
-  const emitProgress = () => {
-    const player = playerRef.current;
+  /* --------------------------------------------------
+     Start Progress Polling
+  -------------------------------------------------- */
 
-    if (!player) return;
+  const startProgressPolling = () => {
+    stopProgressPolling();
 
-    try {
+    pollRef.current = setInterval(() => {
+      const player = playerRef.current;
+
+      if (!player) {
+        return;
+      }
+
+      if (
+        typeof player.getCurrentTime !== "function"
+      ) {
+        return;
+      }
+
       const currentTime =
-        typeof player.getCurrentTime === "function"
-          ? Number(player.getCurrentTime()) || 0
-          : 0;
+        player.getCurrentTime();
 
       const duration =
         typeof player.getDuration === "function"
-          ? Number(player.getDuration()) || 0
+          ? player.getDuration()
           : 0;
 
       onProgress?.({
-        currentTime,
-        duration,
+        currentTime:
+          Number.isFinite(currentTime)
+            ? currentTime
+            : 0,
+
+        duration:
+          Number.isFinite(duration)
+            ? duration
+            : 0,
       });
-    } catch (error) {
-      console.warn(
-        "Progress update failed:",
-        error
-      );
-    }
-  };
-
-  const startPolling = () => {
-    stopPolling();
-
-    emitProgress();
-
-    pollRef.current = setInterval(() => {
-      emitProgress();
     }, PROGRESS_POLL_MS);
   };
 
-  useEffect(() => {
-    let cancelled = false;
+  /* ==================================================
+     CREATE YOUTUBE PLAYER
+  ================================================== */
 
-    destroyedRef.current = false;
+  useEffect(() => {
+    cancelledRef.current = false;
+
+    /*
+      Do not create the player when
+      video ID is missing or invalid.
+    */
 
     if (!isValidVideoId(videoId)) {
+      stopProgressPolling();
+
       return;
     }
 
-    const initialize = async () => {
+    /*
+      Destroy previous player before
+      creating a new one.
+    */
+
+    stopProgressPolling();
+
+    if (playerRef.current) {
       try {
-        const player = await createPlayer(
-          ELEMENT_ID,
-          {
-            videoId: videoId.trim(),
-            volume,
-
-            onReady: (event) => {
-              if (
-                cancelled ||
-                destroyedRef.current
-              ) {
-                return;
-              }
-
-              const target =
-                event?.target;
-
-              if (!target) return;
-
-              playerRef.current =
-                target;
-
-              try {
-                target.setVolume?.(
-                  Math.min(
-                    100,
-                    Math.max(
-                      0,
-                      Number(volume) || 0
-                    )
-                  )
-                );
-              } catch (error) {
-                console.warn(
-                  "Volume setup failed:",
-                  error
-                );
-              }
-
-              /*
-              IMPORTANT:
-              Initial video load hoga,
-              lekin automatically play nahi hoga.
-              User Play button se start karega.
-              */
-
-              onReady?.(event);
-
-              /*
-              Metadata available hone ke liye
-              ek initial progress update.
-              */
-
-              setTimeout(() => {
-                if (!cancelled) {
-                  emitProgress();
-                }
-              }, 500);
-            },
-
-            onStateChange: (event) => {
-              if (
-                cancelled ||
-                destroyedRef.current
-              ) {
-                return;
-              }
-
-              /*
-              PLAYING
-              */
-
-              if (event?.data === 1) {
-                startPolling();
-              }
-
-              /*
-              BUFFERING
-
-              Progress polling continue rakho.
-              */
-
-              else if (event?.data === 3) {
-                startPolling();
-              }
-
-              /*
-              PAUSED / ENDED / CUED
-              */
-
-              else {
-                stopPolling();
-                emitProgress();
-              }
-
-              onStateChange?.(event);
-            },
-
-            onError: (event) => {
-              if (
-                cancelled ||
-                destroyedRef.current
-              ) {
-                return;
-              }
-
-              stopPolling();
-
-              console.error(
-                "YouTube error:",
-                event?.data
-              );
-
-              onError?.(event);
-            },
-
-            onAutoplayBlocked: (event) => {
-              if (
-                cancelled ||
-                destroyedRef.current
-              ) {
-                return;
-              }
-
-              console.warn(
-                "YouTube autoplay was blocked."
-              );
-
-              onAutoplayBlocked?.(
-                event
-              );
-            },
-          }
-        );
-
-        if (
-          cancelled ||
-          destroyedRef.current
-        ) {
-          try {
-            player?.destroy?.();
-          } catch {
-            // ignore
-          }
-
-          return;
-        }
-
-        if (
-          !playerRef.current &&
-          player
-        ) {
-          playerRef.current =
-            player;
-        }
+        playerRef.current.destroy?.();
       } catch (error) {
-        if (
-          cancelled ||
-          destroyedRef.current
-        ) {
-          return;
-        }
-
-        console.error(
-          "YouTube player initialization failed:",
+        console.warn(
+          "Previous YouTube player destroy failed:",
           error
         );
-
-        onError?.({
-          data: 0,
-          error,
-        });
       }
-    };
 
-    initialize();
+      playerRef.current = null;
+    }
+
+    /*
+      Create the YouTube player.
+    */
+
+    createPlayer(ELEMENT_ID, {
+      videoId,
+
+      volume,
+
+      onReady: (event) => {
+        if (cancelledRef.current) {
+          return;
+        }
+
+        const player =
+          event?.target;
+
+        if (!player) {
+          return;
+        }
+
+        playerRef.current =
+          player;
+
+        /*
+          Set initial volume.
+        */
+
+        try {
+          player.setVolume?.(
+            Math.min(
+              100,
+              Math.max(
+                0,
+                Number(volume) || 0
+              )
+            )
+          );
+        } catch (error) {
+          console.warn(
+            "Unable to set YouTube volume:",
+            error
+          );
+        }
+
+        /*
+          IMPORTANT:
+
+          Do NOT call playVideo()
+          here.
+
+          The video should remain
+          paused/cued until the user
+          presses Play.
+        */
+
+        onReady?.(event);
+      },
+
+      onStateChange: (event) => {
+        if (cancelledRef.current) {
+          return;
+        }
+
+        /*
+          YouTube PlayerState:
+
+          -1 = unstarted
+           0 = ended
+           1 = playing
+           2 = paused
+           3 = buffering
+           5 = cued
+        */
+
+        if (event?.data === 1) {
+          /*
+            PLAYING
+          */
+
+          startProgressPolling();
+        } else {
+          /*
+            PAUSED / ENDED /
+            BUFFERING / CUED
+          */
+
+          stopProgressPolling();
+
+          /*
+            Send one final progress
+            update when possible.
+          */
+
+          const player =
+            playerRef.current;
+
+          if (
+            player &&
+            typeof player.getCurrentTime ===
+              "function"
+          ) {
+            const currentTime =
+              player.getCurrentTime();
+
+            const duration =
+              typeof player.getDuration ===
+                "function"
+                ? player.getDuration()
+                : 0;
+
+            onProgress?.({
+              currentTime:
+                Number.isFinite(currentTime)
+                  ? currentTime
+                  : 0,
+
+              duration:
+                Number.isFinite(duration)
+                  ? duration
+                  : 0,
+            });
+          }
+        }
+
+        /*
+          Forward original YouTube
+          state event to MusicProvider.
+        */
+
+        onStateChange?.(event);
+      },
+
+      onError: (event) => {
+        if (cancelledRef.current) {
+          return;
+        }
+
+        stopProgressPolling();
+
+        console.error(
+          "YouTube Player Error:",
+          event?.data
+        );
+
+        onError?.(event);
+      },
+    }).catch((error) => {
+      if (cancelledRef.current) {
+        return;
+      }
+
+      stopProgressPolling();
+
+      console.error(
+        "YouTube player initialization failed:",
+        error
+      );
+
+      onError?.({
+        data: 0,
+        error,
+      });
+    });
+
+    /* --------------------------------------------------
+       Cleanup
+    -------------------------------------------------- */
 
     return () => {
-      cancelled = true;
+      cancelledRef.current = true;
 
-      destroyedRef.current =
-        true;
-
-      stopPolling();
+      stopProgressPolling();
 
       if (playerRef.current) {
         try {
           playerRef.current.destroy?.();
         } catch (error) {
           console.warn(
-            "Player destroy failed:",
+            "YouTube player cleanup failed:",
             error
           );
         }
@@ -285,40 +318,116 @@ const YouTubePlayer = forwardRef(function YouTubePlayer(
       }
     };
 
-    /*
-    IMPORTANT:
-
-    Player sirf ek baar create hoga.
-
-    videoId change hone par player destroy/recreate
-    nahi hoga. MusicProvider direct loadVideoById()
-    karega.
-    */
-
+    // Player must be recreated only
+    // when videoId changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [videoId]);
+
+  /* ==================================================
+     IMPERATIVE METHODS
+  ================================================== */
 
   useImperativeHandle(
     ref,
     () => ({
-      /*
-      ==============================================================
-      LOAD + PLAY
-      ==============================================================
+      /* ----------------------------------------------
+         Cue Video
 
-      Next button ke liye main method.
-      */
+         Loads the video but DOES NOT PLAY it.
+      ---------------------------------------------- */
 
-      loadAndPlay: (id) => {
+      cueVideoById: (id) => {
         if (!isValidVideoId(id)) {
           console.warn(
-            "Invalid video ID:",
+            "Invalid YouTube video ID:",
             id
           );
 
-          return false;
+          return;
         }
 
+        const player =
+          playerRef.current;
+
+        if (!player) {
+          console.warn(
+            "YouTube player is not ready yet."
+          );
+
+          return;
+        }
+
+        try {
+          if (
+            typeof player.cueVideoById ===
+            "function"
+          ) {
+            player.cueVideoById(id);
+          } else {
+            console.warn(
+              "cueVideoById is not available."
+            );
+          }
+        } catch (error) {
+          console.error(
+            "Unable to cue YouTube video:",
+            error
+          );
+        }
+      },
+
+      /* ----------------------------------------------
+         Load Video
+
+         NOTE:
+         This method is kept for compatibility
+         with existing code.
+
+         It loads the video but does not
+         manually call play().
+      ---------------------------------------------- */
+
+      loadVideoById: (id) => {
+        if (!isValidVideoId(id)) {
+          console.warn(
+            "Invalid YouTube video ID:",
+            id
+          );
+
+          return;
+        }
+
+        const player =
+          playerRef.current;
+
+        if (!player) {
+          console.warn(
+            "YouTube player is not ready yet."
+          );
+
+          return;
+        }
+
+        try {
+          if (
+            typeof player.loadVideoById ===
+            "function"
+          ) {
+            player.loadVideoById(id);
+          }
+        } catch (error) {
+          console.error(
+            "Unable to load YouTube video:",
+            error
+          );
+        }
+      },
+
+      /* ----------------------------------------------
+         PLAY
+      ---------------------------------------------- */
+
+      play: () => {
         const player =
           playerRef.current;
 
@@ -327,132 +436,51 @@ const YouTubePlayer = forwardRef(function YouTubePlayer(
             "YouTube player is not ready."
           );
 
-          return false;
-        }
-
-        try {
-          /*
-          YouTube documentation:
-          loadVideoById() video ko load AND play karta hai.
-          */
-
-          player.loadVideoById(
-            id.trim()
-          );
-
-          return true;
-        } catch (error) {
-          console.error(
-            "loadAndPlay failed:",
-            error
-          );
-
-          return false;
-        }
-      },
-
-      /*
-      ==============================================================
-      LOAD WITHOUT PLAY
-      ==============================================================
-      */
-
-      cueVideoById: (id) => {
-        if (!isValidVideoId(id)) {
-          return false;
-        }
-
-        const player =
-          playerRef.current;
-
-        if (!player) {
-          return false;
-        }
-
-        try {
-          player.cueVideoById(
-            id.trim()
-          );
-
-          return true;
-        } catch (error) {
-          console.error(
-            "Cue failed:",
-            error
-          );
-
-          return false;
-        }
-      },
-
-      /*
-      ==============================================================
-      PLAY CURRENT VIDEO
-      ==============================================================
-      */
-
-      play: () => {
-        const player =
-          playerRef.current;
-
-        if (!player) {
-          return false;
+          return;
         }
 
         try {
           player.playVideo?.();
-
-          return true;
         } catch (error) {
           console.error(
-            "Play failed:",
+            "Unable to play YouTube video:",
             error
           );
-
-          return false;
         }
       },
 
-      /*
-      ==============================================================
-      PAUSE
-      ==============================================================
-      */
+      /* ----------------------------------------------
+         PAUSE
+      ---------------------------------------------- */
 
       pause: () => {
         const player =
           playerRef.current;
 
         if (!player) {
-          return false;
+          return;
         }
 
         try {
           player.pauseVideo?.();
-
-          return true;
         } catch (error) {
           console.error(
-            "Pause failed:",
+            "Unable to pause YouTube video:",
             error
           );
-
-          return false;
         }
       },
 
-      /*
-      ==============================================================
-      SEEK
-      ==============================================================
-      */
+      /* ----------------------------------------------
+         SEEK
+      ---------------------------------------------- */
 
       seekTo: (seconds) => {
         const player =
           playerRef.current;
 
         if (!player) {
-          return false;
+          return;
         }
 
         const value =
@@ -461,7 +489,7 @@ const YouTubePlayer = forwardRef(function YouTubePlayer(
         if (
           !Number.isFinite(value)
         ) {
-          return false;
+          return;
         }
 
         try {
@@ -469,177 +497,160 @@ const YouTubePlayer = forwardRef(function YouTubePlayer(
             Math.max(0, value),
             true
           );
-
-          setTimeout(
-            emitProgress,
-            50
-          );
-
-          return true;
         } catch (error) {
           console.error(
-            "Seek failed:",
+            "Unable to seek YouTube video:",
             error
           );
-
-          return false;
         }
       },
 
-      /*
-      ==============================================================
-      VOLUME
-      ==============================================================
-      */
+      /* ----------------------------------------------
+         SET VOLUME
+      ---------------------------------------------- */
 
       setVolume: (value) => {
         const player =
           playerRef.current;
 
-        if (!player) return false;
+        if (!player) {
+          return;
+        }
 
-        const numeric =
+        const numericValue =
           Number(value);
 
         if (
-          !Number.isFinite(numeric)
+          !Number.isFinite(
+            numericValue
+          )
         ) {
-          return false;
+          return;
         }
 
-        try {
-          player.setVolume(
-            Math.min(
-              100,
-              Math.max(
-                0,
-                numeric
-              )
+        const safeValue =
+          Math.min(
+            100,
+            Math.max(
+              0,
+              numericValue
             )
           );
 
-          return true;
-        } catch {
-          return false;
+        try {
+          player.setVolume?.(
+            safeValue
+          );
+        } catch (error) {
+          console.error(
+            "Unable to set YouTube volume:",
+            error
+          );
         }
       },
 
-      /*
-      ==============================================================
-      MUTE
-      ==============================================================
-      */
+      /* ----------------------------------------------
+         MUTE
+      ---------------------------------------------- */
 
       mute: () => {
         try {
           playerRef.current?.mute?.();
-          return true;
-        } catch {
-          return false;
+        } catch (error) {
+          console.error(
+            "Unable to mute YouTube player:",
+            error
+          );
         }
       },
 
-      /*
-      ==============================================================
-      UNMUTE
-      ==============================================================
-      */
+      /* ----------------------------------------------
+         UNMUTE
+      ---------------------------------------------- */
 
       unMute: () => {
         try {
           playerRef.current?.unMute?.();
-          return true;
-        } catch {
-          return false;
+        } catch (error) {
+          console.error(
+            "Unable to unmute YouTube player:",
+            error
+          );
         }
       },
 
-      /*
-      ==============================================================
-      GET CURRENT TIME
-      ==============================================================
-      */
+      /* ----------------------------------------------
+         CURRENT TIME
+      ---------------------------------------------- */
 
       getCurrentTime: () => {
         try {
           return (
-            Number(
-              playerRef.current?.getCurrentTime?.()
-            ) || 0
+            playerRef.current
+              ?.getCurrentTime?.() ?? 0
           );
         } catch {
           return 0;
         }
       },
 
-      /*
-      ==============================================================
-      GET DURATION
-      ==============================================================
-      */
+      /* ----------------------------------------------
+         DURATION
+      ---------------------------------------------- */
 
       getDuration: () => {
         try {
           return (
-            Number(
-              playerRef.current?.getDuration?.()
-            ) || 0
+            playerRef.current
+              ?.getDuration?.() ?? 0
           );
         } catch {
           return 0;
         }
       },
 
-      /*
-      ==============================================================
-      GET PLAYER STATE
-      ==============================================================
-      */
+      /* ----------------------------------------------
+         PLAYER STATE
+      ---------------------------------------------- */
 
       getPlayerState: () => {
         try {
           return (
-            playerRef.current?.getPlayerState?.() ??
-            -1
+            playerRef.current
+              ?.getPlayerState?.() ?? -1
           );
         } catch {
           return -1;
         }
       },
 
-      /*
-      ==============================================================
-      STOP
-      ==============================================================
-      */
+      /* ----------------------------------------------
+         STOP
+      ---------------------------------------------- */
 
       stop: () => {
-        stopPolling();
+        stopProgressPolling();
 
         try {
           playerRef.current?.stopVideo?.();
-
-          return true;
-        } catch {
-          return false;
+        } catch (error) {
+          console.error(
+            "Unable to stop YouTube player:",
+            error
+          );
         }
       },
     }),
     []
   );
 
+  /* ==================================================
+     HIDDEN YOUTUBE PLAYER
+  ================================================== */
+
   return (
     <div
-      className="
-        fixed
-        bottom-0
-        right-0
-        h-px
-        w-px
-        overflow-hidden
-        opacity-0
-        pointer-events-none
-      "
+      className="fixed bottom-0 right-0 h-px w-px overflow-hidden opacity-0 pointer-events-none"
       aria-hidden="true"
     >
       <div id={ELEMENT_ID} />
