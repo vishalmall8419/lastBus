@@ -585,98 +585,11 @@ export default function MusicProvider({
 
   /* --------------------------------------------------
      Load Current Song
-     
-     IMPORTANT:
-     We DO NOT automatically call play().
-     We only load/cue the video.
+
+     The YouTubePlayer owns loading/syncing the
+     current video. Playback is triggered by the
+     actual user action (Play / Next).
   -------------------------------------------------- */
-
-  useEffect(() => {
-    const videoId =
-      state.currentSong?.videoId;
-
-    if (
-      !playerReady ||
-      !videoId ||
-      !playerRef.current
-    ) {
-      return;
-    }
-
-    /*
-      Make sure video ID is valid.
-    */
-
-    if (
-      typeof videoId !== "string" ||
-      videoId.trim().length !== 11
-    ) {
-      dispatch({
-        type: "SET_ERROR",
-        payload:
-          "Invalid YouTube video ID.",
-      });
-
-      return;
-    }
-
-    /*
-      Reset UI state while new
-      video is being prepared.
-    */
-
-    dispatch({
-      type: "SET_PLAYING",
-      payload: false,
-    });
-
-    dispatch({
-      type: "SET_PLAYER_STATUS",
-      payload: "loading",
-    });
-
-    /*
-      IMPORTANT:
-
-      cue() loads the video without
-      automatically starting playback.
-
-      Your YouTubePlayer wrapper must
-      expose cueVideoById().
-    */
-
-    if (
-      typeof playerRef.current
-        .cueVideoById ===
-      "function"
-    ) {
-      playerRef.current.cueVideoById(
-        videoId
-      );
-    } else {
-      /*
-        Fallback for the current wrapper.
-
-        loadVideoById() may start playback,
-        but the state will only become
-        "playing" after YouTube sends
-        the real PLAYING event.
-      */
-
-      playerRef.current.loadVideoById(
-        videoId
-      );
-    }
-
-    smartShuffle.remember(
-      videoId
-    );
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    playerReady,
-    state.currentSong?.videoId,
-  ]);
 
   /* --------------------------------------------------
      Volume
@@ -980,13 +893,33 @@ export default function MusicProvider({
           state.historyIndex <
           state.history.length - 1
         ) {
+          const nextHistoryIndex =
+            state.historyIndex + 1;
+
+          const nextHistorySong =
+            state.history[nextHistoryIndex];
+
+          if (!nextHistorySong?.videoId) {
+            return;
+          }
+
+          /*
+            IMPORTANT:
+            Load + play the next video on the
+            existing YouTube player BEFORE changing
+            React state. This keeps the Next button
+            click inside the browser's user gesture.
+          */
+          playerRef.current?.loadAndPlay?.(
+            nextHistorySong.videoId
+          );
+
           dispatch({
             type:
               "STEP_HISTORY",
 
             payload:
-              state.historyIndex +
-              1,
+              nextHistoryIndex,
           });
 
           return;
@@ -1018,6 +951,15 @@ export default function MusicProvider({
 
           return;
         }
+
+        /*
+          IMPORTANT:
+          Start the next song directly from the
+          user's Next-button gesture.
+        */
+        playerRef.current?.loadAndPlay?.(
+          nextSong.videoId
+        );
 
         dispatch({
           type:

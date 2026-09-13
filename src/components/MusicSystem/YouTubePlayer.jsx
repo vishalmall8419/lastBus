@@ -186,6 +186,8 @@ const YouTubePlayer = forwardRef(function YouTubePlayer(
           presses Play.
         */
 
+        startProgressPolling();
+
         onReady?.(event);
       },
 
@@ -206,18 +208,16 @@ const YouTubePlayer = forwardRef(function YouTubePlayer(
         */
 
         if (event?.data === 1) {
-          /*
-            PLAYING
-          */
-
+          /* PLAYING - polling is already running. */
           startProgressPolling();
         } else {
           /*
-            PAUSED / ENDED /
-            BUFFERING / CUED
+            Do not stop polling for PAUSED, BUFFERING,
+            or CUED. Keeping the poller alive makes the
+            progress clock independent of YouTube state
+            events. When paused, currentTime simply stays
+            unchanged.
           */
-
-          stopProgressPolling();
 
           /*
             Send one final progress
