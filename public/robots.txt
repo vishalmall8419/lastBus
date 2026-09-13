@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# Add your real production domain here after deployment.
+# Sitemap: https://YOUR-DOMAIN.com/sitemap.xml

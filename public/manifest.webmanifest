@@ -1,0 +1,24 @@
+{
+  "name": "LAST BUS \u2014 Night Journey & Radio",
+  "short_name": "LAST BUS",
+  "description": "A cinematic late-night Indian bus journey with rain, music and an immersive radio experience.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0B0E14",
+  "theme_color": "#0B0E14",
+  "lang": "en-IN",
+  "categories": [
+    "entertainment",
+    "music",
+    "lifestyle"
+  ],
+  "icons": [
+    {
+      "src": "/pwa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
