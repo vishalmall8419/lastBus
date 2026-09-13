@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
+
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <!-- Replace YOUR-DOMAIN.com with the real deployed domain. -->
+
   <url>
-    <loc>https://YOUR-DOMAIN.com/</loc>
+    <loc>https://last-bus.vercel.app/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
+
 </urlset>

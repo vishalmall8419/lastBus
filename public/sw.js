@@ -1,6 +1,8 @@
 const CACHE_NAME = "last-bus-v1";
 
-self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("install", () => {
+  self.skipWaiting();
+});
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
@@ -12,15 +14,22 @@ self.addEventListener("activate", (event) => {
       )
     )
   );
+
   self.clients.claim();
 });
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+
   const url = new URL(event.request.url);
 
-  // Never interfere with YouTube playback/API requests.
-  if (url.hostname.includes("youtube.com") || url.hostname.includes("googlevideo.com")) return;
+  // Never interfere with YouTube playback or API requests.
+  if (
+    url.hostname.includes("youtube.com") ||
+    url.hostname.includes("googlevideo.com")
+  ) {
+    return;
+  }
 
   event.respondWith(
     caches.match(event.request).then((cached) => {
@@ -28,8 +37,12 @@ self.addEventListener("fetch", (event) => {
         .then((response) => {
           if (response.ok && url.origin === self.location.origin) {
             const copy = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, copy);
+            });
           }
+
           return response;
         })
         .catch(() => cached);
