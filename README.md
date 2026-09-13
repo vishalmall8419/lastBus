@@ -3,10 +3,8 @@
 <img
   src="/favicon.svg"
   alt="LAST BUS Logo"
-  className="mb-4 h-16 w-16 object-contain drop-shadow-[0_4px_20px_rgba(255,255,255,0.25)] sm:h-20 sm:w-20"
 />
-
-# LAST BUS
+# 🚌 LAST BUS
 
 ### 🌙 The journey continues...
 
@@ -101,19 +99,19 @@ The application brings together:
 
 # ✨ Highlights
 
-| Feature             | Description                                   |
-| ------------------- | --------------------------------------------- |
-| 🎬 Cinematic Hero   | Immersive night journey landing experience    |
-| 🛣️ Journey Scenes   | Multiple visual journey environments          |
-| 🕐 Real-Time Clock  | Live Indian Standard Time                     |
-| 🌧️ Rain Atmosphere  | Cinematic rain and night effects              |
-| 🎵 Music System     | YouTube-powered music discovery and playback  |
-| 📻 Radio Experience | Late-night radio inspired interface           |
-| 📱 PWA              | Installable application experience            |
-| 🔍 SEO              | Search-engine and social sharing optimization |
-| 📱 Responsive       | Designed for desktop, tablet and mobile       |
-| ☁️ Vercel           | Production deployment                         |
-| 💻 GitHub           | Version-controlled open project               |
+| Feature | Description |
+|---|---|
+| 🎬 Cinematic Hero | Immersive night journey landing experience |
+| 🛣️ Journey Scenes | Multiple visual journey environments |
+| 🕐 Real-Time Clock | Live Indian Standard Time |
+| 🌧️ Rain Atmosphere | Cinematic rain and night effects |
+| 🎵 Music System | YouTube-powered music discovery and playback |
+| 📻 Radio Experience | Late-night radio inspired interface |
+| 📱 PWA | Installable application experience |
+| 🔍 SEO | Search-engine and social sharing optimization |
+| 📱 Responsive | Designed for desktop, tablet and mobile |
+| ☁️ Vercel | Production deployment |
+| 💻 GitHub | Version-controlled open project |
 
 ---
 
@@ -1036,13 +1034,13 @@ Before reusing any third-party resource, verify its applicable license and usage
 
 # 🔗 Important Links
 
-| Resource               | Link                                      |
-| ---------------------- | ----------------------------------------- |
-| 🌐 Live Website        | https://last-bus.vercel.app/              |
-| 💻 GitHub Repository   | https://github.com/vishalmall8419/lastBus |
-| 👨‍💻 Developer Portfolio | https://vishalmall.vercel.app/            |
-| 🐙 Developer GitHub    | https://github.com/vishalmall8419         |
-| 📧 Email               | vishal.mall02@outlook.com                 |
+| Resource | Link |
+|---|---|
+| 🌐 Live Website | https://last-bus.vercel.app/ |
+| 💻 GitHub Repository | https://github.com/vishalmall8419/lastBus |
+| 👨‍💻 Developer Portfolio | https://vishalmall.vercel.app/ |
+| 🐙 Developer GitHub | https://github.com/vishalmall8419 |
+| 📧 Email | vishal.mall02@outlook.com |
 
 ---
 
