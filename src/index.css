@@ -1,0 +1,46 @@
+@import url("https://fonts.googleapis.com/css2?family=Yatra+One&family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-night text-cream font-body antialiased;
+    /* A journey should feel still, not scroll-bounced */
+    overscroll-behavior-y: none;
+  }
+
+  ::selection {
+    @apply bg-amber/30 text-cream;
+  }
+
+  :focus-visible {
+    outline: 2px solid theme("colors.amber.DEFAULT");
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+}
+
+@layer components {
+  /* Shared type treatment for small uppercase mono labels — used by the Hero
+     location line, the nav wordmark subtitle, and the Journey Clock badge,
+     so "visual identity" is one rule, not copy-pasted Tailwind stacks. */
+  .lb-eyebrow {
+    @apply font-mono text-xs uppercase tracking-widest2 text-mist;
+  }
+
+  /* "Bus dashboard" chrome: a small recessed, amber-bordered readout used for
+     the Journey Clock and any future dashboard-style indicator. */
+  .lb-dash-badge {
+    @apply flex items-center gap-2 rounded-md border border-amber/30 bg-night-panel/70 px-3 py-1.5 font-mono text-xs text-amber/90 backdrop-blur-sm;
+  }
+}
+
+/* Reduced motion is handled per-element with Tailwind's built-in
+   `motion-reduce:` variant (see components) rather than a global override,
+   so each animated piece can define its own still fallback. */

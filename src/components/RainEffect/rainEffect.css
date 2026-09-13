@@ -1,0 +1,38 @@
+/* RainEffect/rainEffect.css
+   Pure CSS transform animation (no per-frame JS), so it costs the browser
+   almost nothing beyond compositing — safe on mobile. Each drop is a single
+   thin gradient streak; there is no rain "physics", just a falling loop with
+   staggered negative delays so drops don't all start in sync. */
+
+.rain-drop {
+  position: absolute;
+  top: -10%;
+  width: 1.5px;
+  height: 70px;
+  background: linear-gradient(to bottom, transparent, rgba(200, 215, 235, 0.55));
+  animation-name: rainFall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform;
+}
+
+@keyframes rainFall {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(125vh);
+  }
+}
+
+/* Reduced motion: RainEffect simply doesn't render its drops at all (see
+   the component) rather than freezing mid-fall, since a frozen streak reads
+   as a rendering glitch, not a deliberate still frame the way the Hero's
+   Ken Burns freeze does. This stylesheet rule is a belt-and-braces backstop
+   in case the component ever renders drops before checking the preference. */
+@media (prefers-reduced-motion: reduce) {
+  .rain-drop {
+    animation: none !important;
+    display: none;
+  }
+}

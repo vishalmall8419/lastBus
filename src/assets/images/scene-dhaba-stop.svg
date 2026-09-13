@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900">
+  <defs>
+    <linearGradient id="skyD" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#070810"/>
+      <stop offset="100%" stop-color="#161310"/>
+    </linearGradient>
+    <radialGradient id="bulb" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#F2B57A" stop-opacity="0.95"/>
+      <stop offset="60%" stop-color="#E8954C" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#E8954C" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1600" height="900" fill="url(#skyD)"/>
+  <polygon points="0,900 1600,900 1600,620 0,700" fill="#0c0d12"/>
+  <rect x="200" y="420" width="900" height="220" fill="#14100c"/>
+  <rect x="200" y="400" width="900" height="30" fill="#1c1712"/>
+  <g stroke="#3a2e22" stroke-width="4">
+    <line x1="280" y1="430" x2="280" y2="640"/>
+    <line x1="480" y1="430" x2="480" y2="640"/>
+    <line x1="680" y1="430" x2="680" y2="640"/>
+    <line x1="880" y1="430" x2="880" y2="640"/>
+    <line x1="1080" y1="430" x2="1080" y2="640"/>
+  </g>
+  <g>
+    <circle cx="300" cy="410" r="10" fill="url(#bulb)"/>
+    <circle cx="440" cy="405" r="10" fill="url(#bulb)"/>
+    <circle cx="580" cy="412" r="10" fill="url(#bulb)"/>
+    <circle cx="720" cy="404" r="10" fill="url(#bulb)"/>
+    <circle cx="860" cy="410" r="10" fill="url(#bulb)"/>
+    <circle cx="1000" cy="406" r="10" fill="url(#bulb)"/>
+  </g>
+  <ellipse cx="650" cy="500" rx="420" ry="160" fill="url(#bulb)" opacity="0.5"/>
+  <g fill="#0c0d12" opacity="0.9">
+    <rect x="330" y="560" width="60" height="80"/>
+    <rect x="560" y="560" width="60" height="80"/>
+    <rect x="800" y="560" width="60" height="80"/>
+  </g>
+  <g fill="#9B3A34" opacity="0.4">
+    <rect x="200" y="380" width="900" height="20"/>
+  </g>
+</svg>
